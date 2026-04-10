@@ -1,6 +1,7 @@
-import { IBuyer } from '../../../types/index';
-import { TPayment} from '../../../types/index';
-import {EventEmitter} from '../Events';
+import { IBuyer } from '../../types/index';
+import { TPayment} from '../../types/index';
+import {EventEmitter} from '../base/Events';
+import {TErrorsBuyer} from '../../types/index'
 
 export class OrderModel {
   private _payment:TPayment = '';
@@ -51,34 +52,27 @@ export class OrderModel {
     this.events.emit('order:changed', this.getOrderData());
   }
 
-  public validateFields(field?: keyof IBuyer): Partial<Record<keyof IBuyer, string>> {
-    const errors: Partial<Record<keyof IBuyer, string>> = {};
-     if (!field || field === 'payment') {
-        if (this._payment === '') {
-            errors.payment = 'Выберите способ оплаты';
-        }
+  public validateFields(): TErrorsBuyer {
+    const errors: TErrorsBuyer = {};
+
+    if (this._payment === '') {
+        errors.payment = 'Выберите способ оплаты';
     }
 
-    if (!field || field === 'address') {
-        if (this. _address === '') {
-            errors. address = 'Укажите адрес доставки';
-        }
+    if (this._address === '') {
+        errors.address = 'Укажите адрес доставки';
     }
 
-    if (!field || field === 'phone') {
-        if (this._phone === '') {
-            errors.phone = 'Укажите номер телефона';
-        }
+    if (this._phone === '') {
+        errors.phone = 'Укажите номер телефона';
     }
 
-    if (!field || field === 'email') {
-        if (this._email === '') {
-            errors.email = 'Укажите емэйл';
-        }
+    if (this._email === '') {
+        errors.email = 'Укажите email';
     }
 
     return errors;
-    }
+}
 
     public isValid(): boolean {
     return Object.keys(this.validateFields()).length === 0;

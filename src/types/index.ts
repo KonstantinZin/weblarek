@@ -6,6 +6,7 @@ export interface IApi {
 }
 
 export type TPayment = 'card' | 'cash' | '';
+export type TErrorsBuyer = Partial<Record<keyof IBuyer, string>>;
 
 export interface IProduct {
     id: string;
@@ -29,11 +30,7 @@ export interface IProductsfromApi {
     items: IProduct[];
 }
 
-export interface IOrderData {
-    payment: TPayment;
-    email: string;
-    phone: string;
-    address: string;
+export interface IOrderData extends IBuyer {
     total:number;
     items:string[];
 }
