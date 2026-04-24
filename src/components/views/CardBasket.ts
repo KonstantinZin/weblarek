@@ -3,13 +3,13 @@ import { Card } from './Card';
 import { IEvents } from '../base/Events';
 import { IProduct } from '../../types';
 
-export type TCardBasket = Pick<IProduct, 'id' | 'title' | 'price'> & { index: number };
+export type TCardBasket = Pick<IProduct, 'title' | 'price'> & { index: number };
 
 export class CardBasket extends Card<TCardBasket> {
-  protected indexElement: HTMLElement;
-  protected deleteButton: HTMLButtonElement;
+    protected indexElement: HTMLElement;
+    protected deleteButton: HTMLButtonElement;
 
-  constructor(protected events: IEvents) {
+    constructor(protected events: IEvents, onDelete?: () => void) {
         const template = ensureElement<HTMLTemplateElement>('#card-basket');
         const container = cloneTemplate(template);
         super(container);
@@ -17,13 +17,12 @@ export class CardBasket extends Card<TCardBasket> {
         this.indexElement = ensureElement<HTMLElement>('.basket__item-index', this.container);
         this.deleteButton = ensureElement<HTMLButtonElement>('.basket__item-delete', this.container);
 
-        this.deleteButton.addEventListener('click', () => {
-            this.events.emit('basket:remove' , {id: this._id});
-          });
+        if (onDelete) {
+            this.deleteButton.addEventListener('click', onDelete);
+        }
     }
 
-     set index(value: number) {
+    set index(value: number) {
         this.indexElement.textContent = String(value);
     }
-
 }

@@ -1,11 +1,11 @@
 import { ensureElement, cloneTemplate } from '../../utils/utils';
-import { Card } from './Card';
+import { CardWithImage } from './CardWithImage';
 import { IEvents } from '../base/Events';
 import { IProduct } from '../../types';
 
-export type TCardPreview = Pick<IProduct, 'id' | 'title' | 'price' | 'category' | 'description' | 'image'>;
+export type TCardPreview = Pick<IProduct, 'title' | 'price' | 'category' | 'description' | 'image'>;
 
-export class CardPreview extends Card<TCardPreview> {
+export class CardPreview extends CardWithImage<TCardPreview> {
     protected descriptionElement: HTMLElement;
     protected buttonElement: HTMLButtonElement;
 
@@ -18,26 +18,23 @@ export class CardPreview extends Card<TCardPreview> {
         this.buttonElement = ensureElement<HTMLButtonElement>('.card__button', this.container);
 
         this.buttonElement.addEventListener('click', () => {
-          if(this.buttonElement.textContent === 'Купить') {
-            this.events.emit('card:add' , {id: this._id});
-          }
-          else {
-            this.events.emit('card:remove' , {id: this._id});
-          }
-        })
+            this.events.emit('card:action');
+        });
     }
 
     set description(value: string) {
-      this.descriptionElement.textContent = String(value);
+        this.descriptionElement.textContent = String(value);
     }
 
-    set buttonText(value:string) {
-      this.buttonElement.textContent = String(value);
+set inBasket(value: boolean) {
+    if (this.buttonElement.disabled) {
+        this.buttonElement.textContent = 'Недоступно';
+    } else {
+        this.buttonElement.textContent = value ? 'Удалить из корзины' : 'Купить';
     }
+}
 
-    
     set buttonDisabled(value: boolean) {
         this.buttonElement.disabled = value;
     }
-
 }

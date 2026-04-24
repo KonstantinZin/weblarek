@@ -3,7 +3,7 @@ import { CartModel } from '../models/CartModel';
 import { OrderModel } from '../models/OrderModel';
 import { LarekApi } from '../communicate/LarekApi';
 import { EventEmitter } from '../base/Events';
-import { TPayment  } from '../../types';
+import { TPayment } from '../../types';
 import { ensureElement, cloneTemplate } from '../../utils/utils';
 
 import { Header } from '../views/Header';
@@ -25,7 +25,8 @@ export class Presenter {
     private orderForm!: OrderForm;
     private contactsForm!: ContactsForm;
     private successForm!: SuccessForm;
-    private currentProductId: string | null = null;  // Добавлено
+    private currentProductId: string | null = null;
+    private currentProductCard: CardPreview | null = null;
 
     constructor(
         private catalogModel: CatalogModel,
@@ -35,60 +36,62 @@ export class Presenter {
         private events: EventEmitter
     ) {
         this.initViews();
-        
         this.initEvents();
-        
         this.loadProducts();
     }
 
-    private initViews() {
-    const headerContainer = ensureElement<HTMLElement>('.header');
-    const galleryContainer = ensureElement<HTMLElement>('.gallery');
-    const modalContainer = ensureElement<HTMLElement>('.modal');
+    private initViews(): void {
+        const headerContainer = ensureElement<HTMLElement>('.header');
+        const galleryContainer = ensureElement<HTMLElement>('.gallery');
+        const modalContainer = ensureElement<HTMLElement>('.modal');
 
-    this.header = new Header(this.events, headerContainer);
-    this.gallery = new Gallery(galleryContainer);
-    this.modal = new Modal(this.events, modalContainer);
+        this.header = new Header(this.events, headerContainer);
+        this.gallery = new Gallery(galleryContainer);
+        this.modal = new Modal(this.events, modalContainer);
 
-    this.basket = new Basket( this.events);
+        this.basket = new Basket(this.events);
 
-    const orderTemplate = ensureElement<HTMLTemplateElement>('#order');
-    const orderContainer = cloneTemplate(orderTemplate) as HTMLFormElement;
-    this.orderForm = new OrderForm(orderContainer, this.events);
+        const orderTemplate = ensureElement<HTMLTemplateElement>('#order');
+        const orderContainer = cloneTemplate(orderTemplate) as HTMLFormElement;
+        this.orderForm = new OrderForm(orderContainer, this.events);
 
-    const contactsTemplate = ensureElement<HTMLTemplateElement>('#contacts');
-    const contactsContainer = cloneTemplate(contactsTemplate) as HTMLFormElement;
-    this.contactsForm = new ContactsForm(contactsContainer, this.events);
-    this.successForm = new SuccessForm(this.events);
-}
-    
+        const contactsTemplate = ensureElement<HTMLTemplateElement>('#contacts');
+        const contactsContainer = cloneTemplate(contactsTemplate) as HTMLFormElement;
+        this.contactsForm = new ContactsForm(contactsContainer, this.events);
 
-    private initEvents():void {
+        this.successForm = new SuccessForm(this.events);
+    }
+
+    private initEvents(): void {
         this.events.on('products:changed', () => {
             this.renderCatalog();
         });
 
         this.events.on('cart:changed', () => {
             this.updateBasket();
-            if (this.currentProductId) {
-                this.openProductCard(this.currentProductId);
+            if (this.currentProductCard) {
+                const product = this.catalogModel.getSelectedProduct();
+                if (product) {
+                    this.currentProductCard.inBasket = this.cartModel.checkItem(product.id);
+                }
             }
         });
 
         this.events.on('card:select', (data: { id: string }) => {
-            this.openProductCard(data.id);
+            this.currentProductId = data.id;
+            const product = this.catalogModel.getProductById(data.id);
+            if (product) {
+                this.catalogModel.setSelectedProduct(product);
+                this.openProductCard();
+            }
         });
 
-        this.events.on('card:add', (data: { id: string }) => {
-            this.addToBasket(data.id);
-        });
-
-        this.events.on('card:remove', (data: { id: string }) => {
-            this.removeFromBasket(data.id);
+        this.events.on('card:action', () => {
+            this.handleCardAction();
         });
 
         this.events.on('basket:remove', (data: { id: string }) => {
-            this.removeFromBasket(data.id);
+            this.cartModel.deleteItem(data.id);
         });
 
         this.events.on('basket:open', () => {
@@ -99,29 +102,56 @@ export class Presenter {
             this.startOrder();
         });
 
-       this.events.on('order:submit', (data: { payment: string; address: string }) => {
-      this.orderModel.setOrderData({
-        payment: data.payment as TPayment,
-        address: data.address
-    });
-    this.openContactsForm();
-});
+        this.events.on('order:change', (data: { field: string; value: string }) => {
+            if (data.field === 'payment') {
+                this.orderModel.setOrderData({ payment: data.value as TPayment });
+            } else if (data.field === 'address') {
+                this.orderModel.setOrderData({ address: data.value });
+            }
+        });
 
-        this.events.on('contacts:submit', (data: { email: string; phone: string }) => {
-            this.orderModel.setOrderData(data);
+        this.events.on('contacts:change', (data: { field: string; value: string }) => {
+            if (data.field === 'email') {
+                this.orderModel.setOrderData({ email: data.value });
+            } else if (data.field === 'phone') {
+                this.orderModel.setOrderData({ phone: data.value });
+            }
+        });
+
+        this.events.on('order:changed', () => {
+            const orderData = this.orderModel.getOrderData();
+            this.orderForm.payment = orderData.payment;
+            this.orderForm.address = orderData.address;
+            this.orderForm.valid = this.orderModel.isValidStep1();
+            
+            const errors = this.orderModel.validateOrderStep1();
+            const errorMessages = Object.values(errors).filter(Boolean);
+            this.orderForm.errors = errorMessages.join(', ');
+            
+            this.contactsForm.email = orderData.email;
+            this.contactsForm.phone = orderData.phone;
+            this.contactsForm.valid = this.orderModel.isValidStep2();
+            
+            const errors2 = this.orderModel.validateOrderStep2();
+            const errorMessages2 = Object.values(errors2).filter(Boolean);
+            this.contactsForm.errors = errorMessages2.join(', ');
+        });
+
+        this.events.on('order:submit', () => {
+            this.openContactsForm();
+        });
+
+        this.events.on('contacts:submit', () => {
             this.submitOrder();
         });
 
         this.events.on('modal:close', () => {
             this.modal.closeModal();
-            this.currentProductId = null;  
+            this.currentProductCard = null;
         });
 
         this.events.on('success:close', () => {
             this.modal.closeModal();
-            this.cartModel.clearCart();
-            this.orderModel.clear();
-            this.currentProductId = null;  
         });
     }
 
@@ -138,8 +168,9 @@ export class Presenter {
     private renderCatalog(): void {
         const products = this.catalogModel.getProducts();
         const cards = products.map(product => {
-            const card = new CardCatalog(this.events);
-            card.id = product.id;
+            const card = new CardCatalog(this.events, () => {
+                this.events.emit('card:select', { id: product.id });
+            });
             card.title = product.title;
             card.price = product.price;
             card.category = product.category;
@@ -157,8 +188,9 @@ export class Presenter {
         this.header.counter = count;
 
         const basketCards = items.map((item, index) => {
-            const card = new CardBasket(this.events);
-            card.id = item.id;
+            const card = new CardBasket(this.events, () => {
+                this.events.emit('basket:remove', { id: item.id });
+            });
             card.title = item.title;
             card.price = item.price;
             card.index = index + 1;
@@ -169,55 +201,66 @@ export class Presenter {
         this.basket.disabled = items.length === 0;
     }
 
-    private openProductCard(id: string): void {
-        this.currentProductId = id;  
-        const product = this.catalogModel.getProductById(id);
+    private handleCardAction(): void {
+        const product = this.catalogModel.getSelectedProduct();
         if (!product) return;
 
-        const card = new CardPreview(this.events);
-        card.id = product.id;
-        card.title = product.title;
-        card.price = product.price;
-        card.category = product.category;
-        card.image = product.image;
-        card.description = product.description;
-
         const inBasket = this.cartModel.checkItem(product.id);
-        card.buttonText = inBasket ? 'Удалить из корзины' : 'Купить';
-        card.buttonDisabled = product.price === null;
-
-        this.modal.content = card.render();
-        this.modal.openModal();
-    }
-
-    private addToBasket(id: string): void {
-        const product = this.catalogModel.getProductById(id);
-        if (product && product.price !== null) {
-            this.cartModel.addItem(product);
+        if (inBasket) {
+            this.cartModel.deleteItem(product.id);
+        } else {
+            if (product.price !== null) {
+                this.cartModel.addItem(product);
+            }
         }
     }
 
-    private removeFromBasket(id: string): void {
-        this.cartModel.deleteItem(id);
-        this.updateBasket();
+    private openProductCard(): void {
+        const product = this.catalogModel.getSelectedProduct();
+        if (!product) return;
+
+        this.currentProductCard = new CardPreview(this.events);
+        this.currentProductCard.title = product.title;
+        this.currentProductCard.price = product.price;
+        this.currentProductCard.category = product.category;
+        this.currentProductCard.image = product.image;
+        this.currentProductCard.description = product.description;
+        this.currentProductCard.buttonDisabled = product.price === null;
+        this.currentProductCard.inBasket = this.cartModel.checkItem(product.id);
+
+        this.modal.content = this.currentProductCard.render();
+        this.modal.openModal();
     }
 
     private openBasket(): void {
-        this.currentProductId = null;  
-        this.basket.render();
         this.modal.content = this.basket.render();
         this.modal.openModal();
     }
 
     private startOrder(): void {
-        this.currentProductId = null;  
-        this.orderForm.render();
+        const orderData = this.orderModel.getOrderData();
+        this.orderForm.payment = orderData.payment;
+        this.orderForm.address = orderData.address;
+        this.orderForm.valid = this.orderModel.isValidStep1();
+        
+        const errors = this.orderModel.validateOrderStep1();
+        const errorMessages = Object.values(errors).filter(Boolean);
+        this.orderForm.errors = errorMessages.join(', ');
+
         this.modal.content = this.orderForm.render();
         this.modal.openModal();
     }
 
     private openContactsForm(): void {
-        this.contactsForm.render();
+        const orderData = this.orderModel.getOrderData();
+        this.contactsForm.email = orderData.email;
+        this.contactsForm.phone = orderData.phone;
+        this.contactsForm.valid = this.orderModel.isValidStep2();
+        
+        const errors = this.orderModel.validateOrderStep2();
+        const errorMessages = Object.values(errors).filter(Boolean);
+        this.contactsForm.errors = errorMessages.join(', ');
+
         this.modal.content = this.contactsForm.render();
         this.modal.openModal();
     }
@@ -238,6 +281,9 @@ export class Presenter {
 
         this.api.postOrder(orderRequest)
             .then(response => {
+                this.cartModel.clearCart();
+                this.orderModel.clear();
+                this.currentProductId = null;
                 this.successForm.total = response.total;
                 this.modal.content = this.successForm.render();
                 this.modal.openModal();

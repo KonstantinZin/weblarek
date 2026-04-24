@@ -1,5 +1,5 @@
 import { ensureElement, ensureAllElements } from '../../utils/utils';
-import { Form, IForm } from '../views/Form';
+import { Form, IForm } from './Form';
 import { IEvents } from '../base/Events';
 
 export interface IOrderForm extends IForm {
@@ -10,8 +10,6 @@ export interface IOrderForm extends IForm {
 export class OrderForm extends Form<IOrderForm> {
     protected paymentButtons: HTMLButtonElement[];
     protected addressInput: HTMLInputElement;
-    protected _payment: string = '';
-    protected _address: string = '';
 
     constructor(container: HTMLFormElement, protected events: IEvents) {
         super(container);
@@ -21,30 +19,27 @@ export class OrderForm extends Form<IOrderForm> {
 
         this.paymentButtons.forEach(button => {
             button.addEventListener('click', () => {
-                this.payment = button.name;
+                this.events.emit('order:change', {
+                    field: 'payment',
+                    value: button.name
+                });
             });
         });
 
         this.addressInput.addEventListener('input', () => {
-            this._address = this.addressInput.value;
-            this.validate();
+            this.events.emit('order:change', {
+                field: 'address',
+                value: this.addressInput.value
+            });
         });
 
         this.container.addEventListener('submit', (e) => {
             e.preventDefault();
-            const isValid = this._payment !== '' && this._address.trim() !== '';
-            if (isValid) {
-                this.events.emit('order:submit', {
-                    payment: this._payment,
-                    address: this._address
-                });
-            }
+            this.events.emit('order:submit');
         });
     }
 
     set payment(value: string) {
-        this._payment = value;
-        
         this.paymentButtons.forEach(button => {
             if (button.name === value) {
                 button.classList.add('button_alt-active');
@@ -52,19 +47,13 @@ export class OrderForm extends Form<IOrderForm> {
                 button.classList.remove('button_alt-active');
             }
         });
-        
-        this.validate();
     }
 
     set address(value: string) {
-        this._address = value;
         this.addressInput.value = value;
-        this.validate();
     }
 
-    protected validate() {
-        const isValid = this._payment !== '' && this._address.trim() !== '';
-        this.valid = isValid;
-        this.errors = isValid ? '' : 'Выберите способ оплаты и укажите адрес';
+    set errors(value: string) {
+        this.errorsContainer.textContent = value;
     }
 }

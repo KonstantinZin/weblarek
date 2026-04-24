@@ -1,5 +1,5 @@
 import { ensureElement } from '../../utils/utils';
-import { Form, IForm } from '../views/Form';
+import { Form, IForm } from './Form';
 import { IEvents } from '../base/Events';
 
 export interface IContactsForm extends IForm {
@@ -10,8 +10,6 @@ export interface IContactsForm extends IForm {
 export class ContactsForm extends Form<IContactsForm> {
     protected emailInput: HTMLInputElement;
     protected phoneInput: HTMLInputElement;
-    protected _email: string = '';
-    protected _phone: string = '';
 
     constructor(container: HTMLFormElement, protected events: IEvents) {
         super(container);
@@ -20,42 +18,34 @@ export class ContactsForm extends Form<IContactsForm> {
         this.phoneInput = ensureElement<HTMLInputElement>('input[name="phone"]', this.container);
 
         this.emailInput.addEventListener('input', () => {
-            this._email = this.emailInput.value;
-            this.validate();
+            this.events.emit('contacts:change', {
+                field: 'email',
+                value: this.emailInput.value
+            });
         });
 
         this.phoneInput.addEventListener('input', () => {
-            this._phone = this.phoneInput.value;
-            this.validate();
+            this.events.emit('contacts:change', {
+                field: 'phone',
+                value: this.phoneInput.value
+            });
         });
 
         this.container.addEventListener('submit', (e) => {
             e.preventDefault();
-            const isValid = this._email.trim() !== '' && this._phone.trim() !== '';
-            if (isValid) {
-                this.events.emit('contacts:submit', {
-                    email: this._email,
-                    phone: this._phone
-                });
-            }
+            this.events.emit('contacts:submit');
         });
     }
 
     set email(value: string) {
-        this._email = value;
         this.emailInput.value = value;
-        this.validate();
     }
 
     set phone(value: string) {
-        this._phone = value;
         this.phoneInput.value = value;
-        this.validate();
     }
 
-    protected validate() {
-        const isValid = this._email.trim() !== '' && this._phone.trim() !== '';
-        this.valid = isValid;
-        this.errors = isValid ? '' : 'Укажите email и телефон';
+    set errors(value: string) {
+        this.errorsContainer.textContent = value;
     }
 }

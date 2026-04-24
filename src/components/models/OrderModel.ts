@@ -14,13 +14,12 @@ export class OrderModel {
     this.events = events;
   }
 
-
   public getOrderData():IBuyer {
     return {
-    payment: this._payment, 
-    address: this._address, 
-    phone: this._phone, 
-    email: this._email
+      payment: this._payment, 
+      address: this._address, 
+      phone: this._phone, 
+      email: this._email
     };
   }
 
@@ -28,20 +27,16 @@ export class OrderModel {
     if(data.payment !== undefined) {
       this._payment = data.payment;
     }
-
     if(data.address !== undefined) {
       this._address = data.address;
     }
-
     if(data.phone !== undefined) {
       this._phone = data.phone;
     }
-
     if(data.email !== undefined) {
       this._email = data.email;
     }
-
-    this.events.emit('order:changed', this.getOrderData())
+    this.events.emit('order:changed', this.getOrderData());
   }
 
   public clear(): void {
@@ -52,30 +47,54 @@ export class OrderModel {
     this.events.emit('order:changed', this.getOrderData());
   }
 
+  public validateOrderStep1(): TErrorsBuyer {
+    const errors: TErrorsBuyer = {};
+    if (this._payment === '') {
+      errors.payment = 'Выберите способ оплаты';
+    }
+    if (this._address === '') {
+      errors.address = 'Укажите адрес доставки';
+    }
+    return errors;
+  }
+
+  public isValidStep1(): boolean {
+    return Object.keys(this.validateOrderStep1()).length === 0;
+  }
+
+  public validateOrderStep2(): TErrorsBuyer {
+    const errors: TErrorsBuyer = {};
+    if (this._email === '') {
+      errors.email = 'Укажите email';
+    }
+    if (this._phone === '') {
+      errors.phone = 'Укажите номер телефона';
+    }
+    return errors;
+  }
+
+  public isValidStep2(): boolean {
+    return Object.keys(this.validateOrderStep2()).length === 0;
+  }
+
   public validateFields(): TErrorsBuyer {
     const errors: TErrorsBuyer = {};
-
     if (this._payment === '') {
-        errors.payment = 'Выберите способ оплаты';
+      errors.payment = 'Выберите способ оплаты';
     }
-
     if (this._address === '') {
-        errors.address = 'Укажите адрес доставки';
+      errors.address = 'Укажите адрес доставки';
     }
-
     if (this._phone === '') {
-        errors.phone = 'Укажите номер телефона';
+      errors.phone = 'Укажите номер телефона';
     }
-
     if (this._email === '') {
-        errors.email = 'Укажите email';
+      errors.email = 'Укажите email';
     }
-
     return errors;
-}
+  }
 
-    public isValid(): boolean {
+  public isValid(): boolean {
     return Object.keys(this.validateFields()).length === 0;
-}
-  
+  }
 }
